@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { SetFieldValue } from 'react-hook-form'
+import { useEffect } from 'react';
+import { SetFieldValue } from 'react-hook-form';
 
 export interface FormPersistConfig {
   storage?: Storage;
@@ -26,71 +26,80 @@ const useFormPersist = (
     dirty = false,
     touch = false,
     onTimeout,
-    timeout
+    timeout,
   }: FormPersistConfig
 ) => {
-  const watchedValues = watch()
+  const watchedValues = watch();
 
-  const getStorage = () => storage || window.sessionStorage
+  const getStorage = () => storage || window.sessionStorage;
 
-  const clearStorage = () => getStorage().removeItem(name)
+  const clearStorage = () => getStorage().removeItem(name);
 
   useEffect(() => {
-    const str = getStorage().getItem(name)
+    const str = getStorage().getItem(name);
 
     if (str) {
-      const { _timestamp = null, ...values } = JSON.parse(str)
-      const dataRestored: { [key: string]: any } = {}
-      const currTimestamp = Date.now()
+      const { _timestamp = null, ...values } = JSON.parse(str);
+      const dataRestored: { [key: string]: any } = {};
+      const currTimestamp = Date.now();
 
-      if (timeout && (currTimestamp - _timestamp) > timeout) {
-        onTimeout && onTimeout()
-        clearStorage()
-        return
+      if (timeout && currTimestamp - _timestamp > timeout) {
+        onTimeout && onTimeout();
+        clearStorage();
+        return;
       }
 
       Object.keys(values).forEach((key) => {
-        const shouldSet = !exclude.includes(key)
+        const shouldSet = !exclude.includes(key);
         if (shouldSet) {
-          dataRestored[key] = values[key]
+          // serialized date objects should be restored as date objects
+          if (
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(values[key])
+          ) {
+            const possibleDate = new Date(values[key]);
+            if (
+              possibleDate instanceof Date &&
+              !isNaN(possibleDate.getTime())
+            ) {
+              values[key] = possibleDate;
+            }
+          }
+
+          dataRestored[key] = values[key];
           setValue(key, values[key], {
             shouldValidate: validate,
             shouldDirty: dirty,
-            shouldTouch: touch
-          })
+            shouldTouch: touch,
+          });
         }
-      })
+      });
+
+      console.log("data restored", dataRestored)
 
       if (onDataRestored) {
-        onDataRestored(dataRestored)
+        onDataRestored(dataRestored);
       }
     }
-  }, [
-    storage,
-    name,
-    onDataRestored,
-    setValue
-  ])
+  }, [storage, name, onDataRestored, setValue]);
 
   useEffect(() => {
-
     const values = exclude.length
       ? Object.entries(watchedValues)
-        .filter(([key]) => !exclude.includes(key))
-        .reduce((obj, [key, val]) => Object.assign(obj, { [key]: val }), {})
-      : Object.assign({}, watchedValues)
+          .filter(([key]) => !exclude.includes(key))
+          .reduce((obj, [key, val]) => Object.assign(obj, { [key]: val }), {})
+      : Object.assign({}, watchedValues);
 
     if (Object.entries(values).length) {
       if (timeout !== undefined) {
-        values._timestamp = Date.now()
+        values._timestamp = Date.now();
       }
-      getStorage().setItem(name, JSON.stringify(values))
+      getStorage().setItem(name, JSON.stringify(values));
     }
-  }, [watchedValues, timeout])
+  }, [watchedValues, timeout]);
 
   return {
-    clear: () => getStorage().removeItem(name)
-  }
-}
+    clear: () => getStorage().removeItem(name),
+  };
+};
 
-export default useFormPersist
+export default useFormPersist;
